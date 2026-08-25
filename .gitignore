@@ -1,0 +1,74 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment (uv / venv)
+.venv/
+env/
+venv/
+ENV/
+
+# Jupyter & IPython
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Data (Raw files & heavy intermediate tables)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/external/*
+!data/external/.gitkeep
+
+# Models & Artifacts
+models/*
+!models/.gitkeep
+*.pkl
+*.joblib
+*.onnx
+*.pt
+*.pth
+
+# MLflow Tracking & Runs
+mlruns/
+mlartifacts/
+.mlflow/
+
+# Evidently / HTML Reports
+reports/figures/*
+!reports/figures/.gitkeep
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
