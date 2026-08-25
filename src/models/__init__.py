@@ -7,6 +7,13 @@ from src.models.baseline import (
     NaiveForecaster,
     SeasonalNaiveForecaster,
 )
+from src.models.statistical import (
+    AutoARIMAForecaster,
+    AutoETSForecaster,
+    AutoThetaForecaster,
+    CrostonForecaster,
+    StatsForecastBase,
+)
 
 __all__ = [
     "BaseDemandForecaster",
@@ -14,4 +21,9 @@ __all__ = [
     "SeasonalNaiveForecaster",
     "MovingAverageForecaster",
     "ExponentialSmoothingForecaster",
+    "StatsForecastBase",
+    "CrostonForecaster",
+    "AutoThetaForecaster",
+    "AutoETSForecaster",
+    "AutoARIMAForecaster",
 ]
