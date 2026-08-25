@@ -26,35 +26,32 @@ env/
 venv/
 ENV/
 
-# Jupyter & IPython
+# Jupyter & IDEs
 .ipynb_checkpoints
-*/.ipynb_checkpoints/*
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Data (Raw files & heavy intermediate tables)
-data/raw/*
+# Data Artifacts (ignore raw CSVs & large outputs)
+data/raw/*.csv
+data/processed/*.parquet
+data/processed/*.csv
 !data/raw/.gitkeep
-data/processed/*
 !data/processed/.gitkeep
-data/external/*
 !data/external/.gitkeep
 
-# Models & Artifacts
-models/*
+# Models & MLflow Artifacts
+models/*.pkl
+models/*.joblib
+models/*.pt
+models/*.onnx
+models/*.txt
 !models/.gitkeep
-*.pkl
-*.joblib
-*.onnx
-*.pt
-*.pth
-
-# MLflow Tracking & Runs
 mlruns/
-mlartifacts/
 .mlflow/
-
-# Evidently / HTML Reports
-reports/figures/*
-!reports/figures/.gitkeep
+catboost_info/
+lightning_logs/
 
 # Testing & Coverage
 .pytest_cache/
@@ -62,13 +59,6 @@ reports/figures/*
 htmlcov/
 .ruff_cache/
 
-# Environment variables & secrets
-.env
-.env.*
-!.env.example
-
-# IDE & OS
-.vscode/
-.idea/
+# OS Specific
 .DS_Store
 Thumbs.db

@@ -7,6 +7,7 @@ from src.models.baseline import (
     NaiveForecaster,
     SeasonalNaiveForecaster,
 )
+from src.models.gbm import CatBoostForecaster, LightGBMForecaster
 from src.models.statistical import (
     AutoARIMAForecaster,
     AutoETSForecaster,
@@ -26,4 +27,6 @@ __all__ = [
     "AutoThetaForecaster",
     "AutoETSForecaster",
     "AutoARIMAForecaster",
+    "LightGBMForecaster",
+    "CatBoostForecaster",
 ]
