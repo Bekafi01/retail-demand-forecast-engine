@@ -1,6 +1,7 @@
 """Gradient Boosted Decision Tree (GBDT) forecasters: LightGBM and CatBoost with Tweedie objective."""
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
+
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
@@ -184,7 +185,9 @@ class LightGBMForecaster(BaseDemandForecaster):
             raise ValueError("Model must be fitted before predict() is called.")
 
         if "sales_lag_28" not in pred_df.columns:
-            features_df = build_feature_table(pred_df, target_col=self.target_col, date_col=self.date_col)
+            features_df = build_feature_table(
+                pred_df, target_col=self.target_col, date_col=self.date_col
+            )
         else:
             features_df = pred_df.copy()
 
@@ -211,10 +214,16 @@ class LightGBMForecaster(BaseDemandForecaster):
             raise ValueError("Model must be fitted before getting feature importances.")
 
         imp = self.model.feature_importance(importance_type=importance_type)
-        df_imp = pd.DataFrame({
-            "feature": self.feature_cols,
-            "importance": imp,
-        }).sort_values("importance", ascending=False).reset_index(drop=True)
+        df_imp = (
+            pd.DataFrame(
+                {
+                    "feature": self.feature_cols,
+                    "importance": imp,
+                }
+            )
+            .sort_values("importance", ascending=False)
+            .reset_index(drop=True)
+        )
         return df_imp
 
 
@@ -312,7 +321,9 @@ class CatBoostForecaster(BaseDemandForecaster):
             raise ValueError("Model must be fitted before predict() is called.")
 
         if "sales_lag_28" not in pred_df.columns:
-            features_df = build_feature_table(pred_df, target_col=self.target_col, date_col=self.date_col)
+            features_df = build_feature_table(
+                pred_df, target_col=self.target_col, date_col=self.date_col
+            )
         else:
             features_df = pred_df.copy()
 

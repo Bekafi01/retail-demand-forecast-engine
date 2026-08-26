@@ -22,6 +22,8 @@ A production-grade, end-to-end retail demand forecasting platform built on the K
 - **Production Serving & Analytics UI**:
   - High-performance **FastAPI** async service with Pydantic validation for point forecasts, conformal intervals, and drift evaluation.
   - Interactive **Streamlit** dashboard featuring Forecast Explorer, What-If Scenario Pricing Simulator, and MLOps Drift Monitor.
+- **Enterprise CI/CD & Containerization**:
+  - Multi-target `Dockerfile` using `uv` frozen dependencies, `docker-compose.yml` for unified FastAPI + Streamlit + MLflow deployment, and GitHub Actions workflows for automated testing and scheduled weekly retraining.
 
 ---
 
@@ -29,6 +31,9 @@ A production-grade, end-to-end retail demand forecasting platform built on the K
 
 ```
 retail-demand-forecast-engine/
+├── .github/workflows/
+│   ├── ci.yml                             # Automated linting & pytest test suite
+│   └── retrain.yml                        # Scheduled / manual model retraining workflow
 ├── configs/
 │   └── model_config.yaml                  # Central configuration
 ├── data/
@@ -52,8 +57,13 @@ retail-demand-forecast-engine/
 ├── ui/
 │   ├── app.py                             # Streamlit main dashboard
 │   └── pages/                             # Forecast Explorer, Simulator, Drift Monitor
-├── notebooks/                             # 6-part exploratory and benchmarking series
+├── reports/
+│   ├── figures/                           # Benchmark plots (master leaderboard, pareto frontier)
+│   └── final_report.md                    # Executive benchmark report & supply chain impact
+├── notebooks/                             # 7-part exploratory and benchmarking series
 ├── tests/                                 # 32 unit tests across all engine modules
+├── Dockerfile                             # Multi-stage uv container
+├── docker-compose.yml                     # Unified multi-container orchestration
 └── pyproject.toml                         # uv-managed dependencies and tooling
 ```
 
@@ -72,22 +82,22 @@ uv sync --all-extras
 uv run pytest -v
 ```
 
-### 3. Start the FastAPI Serving Microservice
+### 3. Start the Services Locally
 ```bash
+# Start FastAPI Serving Microservice
 uv run uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload
-```
-- API Docs: `http://localhost:8000/docs`
-- Health Check: `http://localhost:8000/health`
 
-### 4. Launch the Streamlit Interactive Dashboard
-```bash
+# Launch Streamlit Analytics Dashboard
 uv run streamlit run ui/app.py
-```
-- Open `http://localhost:8501` to view the Forecast Explorer, What-If Scenario Simulator, and MLOps Drift Monitor.
 
-### 5. Execute the Automated Training & Registry Pipeline
-```bash
+# Execute Retraining Pipeline
 uv run python mlops/pipeline/train_pipeline.py --config configs/model_config.yaml
+```
+
+### 4. Docker Deployment
+```bash
+# Build and launch all 3 services (FastAPI, Streamlit, MLflow Server)
+docker compose up --build
 ```
 
 ---
@@ -100,3 +110,4 @@ uv run python mlops/pipeline/train_pipeline.py --config configs/model_config.yam
 4. **[04_ml_models.ipynb](notebooks/04_ml_models.ipynb)**: LightGBM and CatBoost with Tweedie loss, Gain feature importance, and multi-step forecasting.
 5. **[05_hierarchical_conformal.ipynb](notebooks/05_hierarchical_conformal.ipynb)**: Summing Matrix $S$, MinT hierarchical reconciliation, and Split Conformal Prediction intervals.
 6. **[06_mlops_monitoring.ipynb](notebooks/06_mlops_monitoring.ipynb)**: MLflow experiment tracking, Champion model registration, and PSI data drift simulation.
+7. **[07_model_benchmark_report.ipynb](notebooks/07_model_benchmark_report.ipynb)**: Master comparative benchmark matrix, Pareto latency-accuracy frontier, and statistical significance testing.

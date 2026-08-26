@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  # 1. FastAPI Production Serving API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: retail_forecast_api
+    command: uv run uvicorn api.app:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./mlruns:/app/mlruns
+      - ./mlflow.db:/app/mlflow.db
+    environment:
+      - MLFLOW_TRACKING_URI=sqlite:///mlflow.db
+      - MLFLOW_ALLOW_FILE_STORE=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 2. Streamlit Analytics & Scenario Dashboard
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: retail_forecast_ui
+    command: uv run streamlit run ui/app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./mlruns:/app/mlruns
+      - ./mlflow.db:/app/mlflow.db
+    environment:
+      - MLFLOW_TRACKING_URI=sqlite:///mlflow.db
+      - API_URL=http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # 3. MLflow Tracking & Registry Server
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: retail_forecast_mlflow
+    command: uv run mlflow server --backend-store-uri sqlite:///mlflow.db --default-artifact-root /app/mlruns --host 0.0.0.0 --port 5000
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/app/mlruns
+      - ./mlflow.db:/app/mlflow.db
+    restart: unless-stopped

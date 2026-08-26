@@ -1,0 +1,44 @@
+name: Retrain Model Pipeline
+
+on:
+  schedule:
+    # Run every Sunday at 02:00 UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      sample_series:
+        description: 'Number of series for training batch'
+        required: false
+        default: '500'
+
+jobs:
+  retrain:
+    name: Execute Retraining & Registry Evaluation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install Dependencies
+        run: uv sync --all-extras
+
+      - name: Run Retraining Pipeline
+        run: |
+          uv run python mlops/pipeline/train_pipeline.py --config configs/model_config.yaml --sample-series ${{ github.event.inputs.sample_series || '500' }}
+
+      - name: Upload MLflow Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-database
+          path: mlflow.db
+          retention-days: 14
