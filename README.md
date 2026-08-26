@@ -1,33 +1,102 @@
 # Retail Demand Forecast Engine
 
-A production-grade retail demand forecasting platform built on the Kaggle M5 Forecasting hierarchical dataset (Walmart unit sales).
+A production-grade, end-to-end retail demand forecasting platform built on the Kaggle M5 Forecasting dataset (Walmart hierarchical unit sales data).
 
-## Key Features
+---
 
-- **Multi-Model Forecasting Suite**: Baselines, Classical Statistical models (AutoARIMA, Croston), Gradient Boosted Trees (LightGBM/CatBoost), and Neural Sequence models.
-- **Hierarchical Coherence**: MinT (Minimum Trace) and Top-Down reconciliation across all 12 Walmart hierarchy levels.
-- **Uncertainty Quantification**: Split Conformal Prediction and Quantile intervals (P10, P50, P90).
-- **MLOps & Monitoring**: MLflow experiment tracking & model registry, Population Stability Index (PSI) feature drift, and prediction drift monitoring.
-- **Serving & UI**: High-performance FastAPI endpoint and interactive Streamlit analytics explorer.
+## 🌟 Key Features
 
-## Quick Start
+- **Multi-Model Forecasting Suite**:
+  - *Baselines*: Naive, Seasonal Naive (7-day), Moving Average (28-day), Exponential Smoothing.
+  - *Statistical*: Croston (Classic & SBA for intermittent zero-inflated demand), AutoTheta, AutoETS, AutoARIMA.
+  - *Gradient Boosted Trees*: LightGBM and CatBoost with Compound Poisson-Gamma **Tweedie Loss** ($p = 1.15$).
+- **Leak-Free Feature Store**:
+  - Polars-accelerated $\ge 28$-day shifted lags, rolling window aggregations (mean, std, min, max), promotional discount depth, price momentum, cyclical calendar encodings, and state-level SNAP benefit flags (`snap_CA`, `snap_TX`, `snap_WI`).
+- **Hierarchical Reconciliation**:
+  - Summing Matrix ($S$) construction and **MinT (Minimum Trace)** reconciliation with Structural WLS and Shrinkage covariance weighting across all Walmart organizational levels.
+- **Uncertainty Quantification**:
+  - **Split Conformal Prediction (SCP)** generating distribution-free prediction intervals (80% and 90% confidence bands) with finite-sample coverage guarantees.
+- **MLOps & Drift Monitoring**:
+  - **MLflow Tracking & Model Registry**: Automatic logging of hyperparameters, rolling backtest validation metrics (WRMSSE, WAPE, RMSE), and Champion vs Challenger promotion.
+  - **Population Stability Index (PSI)** & KS-test data drift detection with automated retraining triggers.
+- **Production Serving & Analytics UI**:
+  - High-performance **FastAPI** async service with Pydantic validation for point forecasts, conformal intervals, and drift evaluation.
+  - Interactive **Streamlit** dashboard featuring Forecast Explorer, What-If Scenario Pricing Simulator, and MLOps Drift Monitor.
+
+---
+
+## 🏗️ Project Architecture
+
+```
+retail-demand-forecast-engine/
+├── configs/
+│   └── model_config.yaml                  # Central configuration
+├── data/
+│   ├── raw/                               # Raw Kaggle M5 CSVs (calendar, prices, sales)
+│   └── processed/                         # Memory-reduced parquet feature stores
+├── src/
+│   ├── data/                              # Ingestion, downcasting, and synthetic generator
+│   ├── features/                          # Calendar, SNAP, price momentum, shifted lags
+│   ├── models/                            # Baselines, Croston, AutoTheta, LightGBM, MinT
+│   ├── evaluation/                        # WRMSSE, WAPE, Rolling Backtesting, Conformal Calibrator
+│   └── utils/                             # Logger and Pydantic configuration loader
+├── mlops/
+│   ├── tracking/                          # MLflow experiment tracking wrapper
+│   ├── registry/                          # Model registry & Champion vs Challenger promotion
+│   ├── monitoring/                        # Population Stability Index (PSI) drift detector
+│   └── pipeline/                          # CLI training pipeline orchestrator
+├── api/
+│   ├── app.py                             # FastAPI service
+│   ├── routes.py                          # /predict, /health, and /drift/evaluate routes
+│   └── schemas.py                         # Pydantic v2 schemas
+├── ui/
+│   ├── app.py                             # Streamlit main dashboard
+│   └── pages/                             # Forecast Explorer, Simulator, Drift Monitor
+├── notebooks/                             # 6-part exploratory and benchmarking series
+├── tests/                                 # 32 unit tests across all engine modules
+└── pyproject.toml                         # uv-managed dependencies and tooling
+```
+
+---
+
+## 🚀 Quick Start
 
 ### 1. Installation
+Ensure [uv](https://docs.astral.sh/uv/) is installed:
 ```bash
-# Sync all dependencies including dev tools
 uv sync --all-extras
 ```
 
-### 2. Run Tests
+### 2. Run the Full Test Suite
 ```bash
-uv run pytest
+uv run pytest -v
 ```
 
-### 3. Start Services
+### 3. Start the FastAPI Serving Microservice
 ```bash
-# Start FastAPI server
-uv run uvicorn api.main:app --reload --port 8000
-
-# Start Streamlit UI
-uv run streamlit run ui/Home.py --server.port 8501
+uv run uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload
 ```
+- API Docs: `http://localhost:8000/docs`
+- Health Check: `http://localhost:8000/health`
+
+### 4. Launch the Streamlit Interactive Dashboard
+```bash
+uv run streamlit run ui/app.py
+```
+- Open `http://localhost:8501` to view the Forecast Explorer, What-If Scenario Simulator, and MLOps Drift Monitor.
+
+### 5. Execute the Automated Training & Registry Pipeline
+```bash
+uv run python mlops/pipeline/train_pipeline.py --config configs/model_config.yaml
+```
+
+---
+
+## 📓 Notebook Series
+
+1. **[01_eda.ipynb](notebooks/01_eda.ipynb)**: Hierarchy structure, intermittency, SNAP patterns, price elasticity, and stationarity tests.
+2. **[02_baselines_backtest.ipynb](notebooks/02_baselines_backtest.ipynb)**: Rolling temporal cross-validation and official WRMSSE/WAPE benchmark.
+3. **[03_statistical_models.ipynb](notebooks/03_statistical_models.ipynb)**: Croston SBA, AutoTheta, AutoETS, and intermittent demand slicing.
+4. **[04_ml_models.ipynb](notebooks/04_ml_models.ipynb)**: LightGBM and CatBoost with Tweedie loss, Gain feature importance, and multi-step forecasting.
+5. **[05_hierarchical_conformal.ipynb](notebooks/05_hierarchical_conformal.ipynb)**: Summing Matrix $S$, MinT hierarchical reconciliation, and Split Conformal Prediction intervals.
+6. **[06_mlops_monitoring.ipynb](notebooks/06_mlops_monitoring.ipynb)**: MLflow experiment tracking, Champion model registration, and PSI data drift simulation.

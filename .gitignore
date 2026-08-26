@@ -50,6 +50,7 @@ models/*.txt
 !models/.gitkeep
 mlruns/
 .mlflow/
+mlflow.db*
 catboost_info/
 lightning_logs/
 

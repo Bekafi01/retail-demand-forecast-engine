@@ -1,7 +1,6 @@
 """Gradient Boosted Decision Tree (GBDT) forecasters: LightGBM and CatBoost with Tweedie objective."""
 
-from typing import Any, List, Optional
-
+from typing import Any, Dict, List, Optional, Union
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
@@ -58,6 +57,21 @@ class LightGBMForecaster(BaseDemandForecaster):
         self.categorical_cols = categorical_cols
         self.model: Optional[lgb.Booster] = None
 
+    def get_params(self, deep: bool = True) -> Dict[str, Any]:
+        """Return model parameters for MLflow logging and hyperparameter tuning."""
+        return {
+            "name": self.name,
+            "objective": self.objective,
+            "tweedie_variance_power": self.tweedie_variance_power,
+            "learning_rate": self.learning_rate,
+            "num_leaves": self.num_leaves,
+            "n_estimators": self.n_estimators,
+            "feature_fraction": self.feature_fraction,
+            "bagging_fraction": self.bagging_fraction,
+            "bagging_freq": self.bagging_freq,
+            "random_state": self.random_state,
+        }
+
     def fit(
         self,
         train_df: pd.DataFrame,
@@ -91,6 +105,11 @@ class LightGBMForecaster(BaseDemandForecaster):
                 if full_train[col].dtype == "category" or str(full_train[col].dtype) == "object"
             ]
 
+        # Ensure categoricals are properly typed
+        for col in self.categorical_cols:
+            if col in full_train.columns:
+                full_train[col] = full_train[col].astype("category")
+
         X_train = full_train[self.feature_cols]
         y_train = full_train[target_col].values
 
@@ -111,6 +130,10 @@ class LightGBMForecaster(BaseDemandForecaster):
                 full_val = val_df.copy()
             full_val = full_val.dropna(subset=["sales_lag_28"]).reset_index(drop=True)
             if not full_val.empty:
+                for col in self.categorical_cols:
+                    if col in full_val.columns:
+                        full_val[col] = full_val[col].astype("category")
+
                 val_data = lgb.Dataset(
                     full_val[self.feature_cols],
                     label=full_val[target_col].values,
@@ -161,15 +184,19 @@ class LightGBMForecaster(BaseDemandForecaster):
             raise ValueError("Model must be fitted before predict() is called.")
 
         if "sales_lag_28" not in pred_df.columns:
-            features_df = build_feature_table(
-                pred_df, target_col=self.target_col, date_col=self.date_col
-            )
+            features_df = build_feature_table(pred_df, target_col=self.target_col, date_col=self.date_col)
         else:
             features_df = pred_df.copy()
 
         for col in self.feature_cols:
             if col not in features_df.columns:
                 features_df[col] = 0
+
+        # Ensure all categorical columns match category dtype
+        if self.categorical_cols:
+            for col in self.categorical_cols:
+                if col in features_df.columns:
+                    features_df[col] = features_df[col].astype("category")
 
         X_pred = features_df[self.feature_cols]
         raw_preds = self.model.predict(X_pred)
@@ -184,16 +211,10 @@ class LightGBMForecaster(BaseDemandForecaster):
             raise ValueError("Model must be fitted before getting feature importances.")
 
         imp = self.model.feature_importance(importance_type=importance_type)
-        df_imp = (
-            pd.DataFrame(
-                {
-                    "feature": self.feature_cols,
-                    "importance": imp,
-                }
-            )
-            .sort_values("importance", ascending=False)
-            .reset_index(drop=True)
-        )
+        df_imp = pd.DataFrame({
+            "feature": self.feature_cols,
+            "importance": imp,
+        }).sort_values("importance", ascending=False).reset_index(drop=True)
         return df_imp
 
 
@@ -227,6 +248,17 @@ class CatBoostForecaster(BaseDemandForecaster):
         self.categorical_cols: Optional[List[str]] = None
         self.model: Optional[CatBoostRegressor] = None
 
+    def get_params(self, deep: bool = True) -> Dict[str, Any]:
+        """Return model parameters for MLflow logging and hyperparameter tuning."""
+        return {
+            "name": self.name,
+            "iterations": self.iterations,
+            "learning_rate": self.learning_rate,
+            "depth": self.depth,
+            "loss_function": self.loss_function,
+            "random_seed": self.random_seed,
+        }
+
     def fit(
         self,
         train_df: pd.DataFrame,
@@ -252,7 +284,6 @@ class CatBoostForecaster(BaseDemandForecaster):
             if full_train[col].dtype == "category" or str(full_train[col].dtype) == "object"
         ]
 
-        # Convert categories to string for CatBoost
         X_train = full_train[self.feature_cols].copy()
         for c in self.categorical_cols:
             X_train[c] = X_train[c].astype(str)
@@ -281,9 +312,7 @@ class CatBoostForecaster(BaseDemandForecaster):
             raise ValueError("Model must be fitted before predict() is called.")
 
         if "sales_lag_28" not in pred_df.columns:
-            features_df = build_feature_table(
-                pred_df, target_col=self.target_col, date_col=self.date_col
-            )
+            features_df = build_feature_table(pred_df, target_col=self.target_col, date_col=self.date_col)
         else:
             features_df = pred_df.copy()
 

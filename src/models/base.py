@@ -2,8 +2,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, List, Optional, Union
-
+from typing import Any, Dict, List, Optional, Union
 import joblib
 import numpy as np
 import pandas as pd
@@ -16,6 +15,20 @@ class BaseDemandForecaster(ABC):
         self.name = name
         self.params = params
         self.is_fitted = False
+
+    def get_params(self, deep: bool = True) -> Dict[str, Any]:
+        """Get model parameters (scikit-learn estimator compatible)."""
+        params = {"name": self.name}
+        params.update(self.params)
+        return params
+
+    def set_params(self, **params: Any) -> "BaseDemandForecaster":
+        """Set model parameters."""
+        for key, value in params.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            self.params[key] = value
+        return self
 
     @abstractmethod
     def fit(

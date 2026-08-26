@@ -38,6 +38,10 @@ def extract_lag_and_rolling_features(
     df_pl = pl.from_pandas(df) if isinstance(df, pd.DataFrame) else df
     df_pl = df_pl.sort([group_col, date_col])
 
+    # If target_col not present (e.g. inference payload), create zero column
+    if target_col not in df_pl.columns:
+        df_pl = df_pl.with_columns(pl.lit(0.0).cast(pl.Float32).alias(target_col))
+
     # 1. Discrete shifted lag expressions & rolling stats
     lag_exprs: List[pl.Expr] = []
     for lag in lags:
@@ -75,7 +79,7 @@ def extract_lag_and_rolling_features(
 
     df_featured = df_pl.with_columns(lag_exprs)
 
-    # 2. Ratio / Relative momentum features (computed after base lag columns exist)
+    # 2. Ratio / Relative momentum features
     ratio_exprs = []
     lag_col_name = f"sales_lag_{base_shift}"
     rm7_col_name = f"rolling_mean_7_lag_{base_shift}"
