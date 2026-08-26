@@ -8,6 +8,7 @@ from src.models.baseline import (
     SeasonalNaiveForecaster,
 )
 from src.models.gbm import CatBoostForecaster, LightGBMForecaster
+from src.models.hierarchical import HierarchicalReconciler, aggregate_hierarchy
 from src.models.statistical import (
     AutoARIMAForecaster,
     AutoETSForecaster,
@@ -29,4 +30,6 @@ __all__ = [
     "AutoARIMAForecaster",
     "LightGBMForecaster",
     "CatBoostForecaster",
+    "HierarchicalReconciler",
+    "aggregate_hierarchy",
 ]
