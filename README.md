@@ -75,17 +75,24 @@ All models evaluated under rigorous **3-fold rolling-origin temporal backtesting
 
 ### 1. Leak-Free Feature Store (Polars-Accelerated)
 - **Base-Shifted Lags ($\ge 28$ days)**: Lags ($t-28, t-35, t-42, t-49, t-56, t-63, t-70$) and rolling window aggregates (7, 14, 28, 60, 90, 180 days) are computed on base-shifted series to mathematically guarantee zero target leakage during inference.
-- **Promotional Dynamics**: Computes discount depth ratios ($\frac{\text{price\_max} - \text{price}}{\text{price\_max}}$) and weekly/monthly price momentum.
+- **Promotional Dynamics**: Computes discount depth ratios ($\frac{P_{\max} - P}{P_{\max}}$) and weekly/monthly price momentum.
 - **State SNAP Benefit Cycles**: Captures state-specific food stamp disbursement waves (`snap_CA`, `snap_TX`, `snap_WI`) that drive recurring early-month demand surges.
 
 ### 2. Hierarchical Summing Matrix ($S$) & MinT Reconciliation
 - Aggregates unit demand across 12 hierarchical tiers (Total $\rightarrow$ State $\rightarrow$ Store $\rightarrow$ Category $\rightarrow$ Department $\rightarrow$ Item).
 - **Minimum Trace (MinT)** reconciliation with structural covariance weights ($W = \text{diag}(S \mathbf{1})$) resolves bottom-up errors:
-  $$\tilde{\mathbf{y}}_t = S (S^T W^{-1} S)^{-1} S^T W^{-1} \hat{\mathbf{y}}_t$$
+
+$$
+\tilde{\mathbf{y}}_t = S (S^T W^{-1} S)^{-1} S^T W^{-1} \hat{\mathbf{y}}_t
+$$
 
 ### 3. Distribution-Free Conformal Uncertainty (SCP)
 - Uses **Split Conformal Prediction (SCP)** to construct calibrated prediction intervals ($P_{10}, P_{50}, P_{90}$) without assuming Gaussian error residuals:
-  $$C(X_{n+1}) = \left[ \hat{y}_{n+1} - \hat{q}_{1-\alpha}(R), \; \hat{y}_{n+1} + \hat{q}_{1-\alpha}(R) \right]$$
+
+$$
+C(X_{n+1}) = \left[ \hat{y}_{n+1} - \hat{q}_{1-\alpha}(R), \; \hat{y}_{n+1} + \hat{q}_{1-\alpha}(R) \right]
+$$
+
 - Achieves an exact **90.2% empirical coverage rate** on out-of-fold validation sets.
 
 ### 4. MLOps Drift Governance & Automated Promotion
