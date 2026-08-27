@@ -10,6 +10,7 @@ A production-grade, end-to-end retail demand forecasting platform built on the K
   - *Baselines*: Naive, Seasonal Naive (7-day), Moving Average (28-day), Exponential Smoothing.
   - *Statistical*: Croston (Classic & SBA for intermittent zero-inflated demand), AutoTheta, AutoETS, AutoARIMA.
   - *Gradient Boosted Trees*: LightGBM and CatBoost with Compound Poisson-Gamma **Tweedie Loss** ($p = 1.15$).
+  - *Deep Learning*: Deep Multi-Layer Perceptrons (**MLP**) with latent embeddings, standard scaling, and Adam optimization.
 - **Leak-Free Feature Store**:
   - Polars-accelerated $\ge 28$-day shifted lags, rolling window aggregations (mean, std, min, max), promotional discount depth, price momentum, cyclical calendar encodings, and state-level SNAP benefit flags (`snap_CA`, `snap_TX`, `snap_WI`).
 - **Hierarchical Reconciliation**:
@@ -42,7 +43,7 @@ retail-demand-forecast-engine/
 ├── src/
 │   ├── data/                              # Ingestion, downcasting, and synthetic generator
 │   ├── features/                          # Calendar, SNAP, price momentum, shifted lags
-│   ├── models/                            # Baselines, Croston, AutoTheta, LightGBM, MinT
+│   ├── models/                            # Baselines, Croston, AutoTheta, LightGBM, Neural MLP, MinT
 │   ├── evaluation/                        # WRMSSE, WAPE, Rolling Backtesting, Conformal Calibrator
 │   └── utils/                             # Logger and Pydantic configuration loader
 ├── mlops/
@@ -60,8 +61,8 @@ retail-demand-forecast-engine/
 ├── reports/
 │   ├── figures/                           # Benchmark plots (master leaderboard, pareto frontier)
 │   └── final_report.md                    # Executive benchmark report & supply chain impact
-├── notebooks/                             # 7-part exploratory and benchmarking series
-├── tests/                                 # 32 unit tests across all engine modules
+├── notebooks/                             # 8-part exploratory and benchmarking series
+├── tests/                                 # 35 unit tests across all engine modules
 ├── Dockerfile                             # Multi-stage uv container
 ├── docker-compose.yml                     # Unified multi-container orchestration
 └── pyproject.toml                         # uv-managed dependencies and tooling
@@ -111,3 +112,4 @@ docker compose up --build
 5. **[05_hierarchical_conformal.ipynb](notebooks/05_hierarchical_conformal.ipynb)**: Summing Matrix $S$, MinT hierarchical reconciliation, and Split Conformal Prediction intervals.
 6. **[06_mlops_monitoring.ipynb](notebooks/06_mlops_monitoring.ipynb)**: MLflow experiment tracking, Champion model registration, and PSI data drift simulation.
 7. **[07_model_benchmark_report.ipynb](notebooks/07_model_benchmark_report.ipynb)**: Master comparative benchmark matrix, Pareto latency-accuracy frontier, and statistical significance testing.
+8. **[08_deep_learning.ipynb](notebooks/08_deep_learning.ipynb)**: Deep MLP neural architecture, Adam loss curves, and head-to-head backtesting vs LightGBM.
