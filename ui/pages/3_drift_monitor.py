@@ -16,13 +16,28 @@ from mlops.monitoring.drift import DriftDetector, calculate_psi
 from src.data.loader import generate_synthetic_m5_data
 from src.data.preprocess import melt_sales_data, merge_calendar_and_prices
 from src.features.pipeline import build_feature_table
+from ui.styles import PLOTLY_LAYOUT, apply_custom_styles
 
 st.set_page_config(page_title="Drift Monitor", page_icon="🛡️", layout="wide")
+apply_custom_styles()
 
-st.title("🛡️ MLOps Drift Monitor (PSI & Feature Stability)")
-st.markdown("""
-Continuous data drift monitoring using the **Population Stability Index (PSI)** and **Two-Sample Kolmogorov-Smirnov Tests** against training baseline distributions.
-""")
+st.markdown(
+    """
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem;">
+            <span class="badge badge-blue">MLOPS TELEMETRY</span>
+            <span class="badge badge-green">LIVE MONITORING</span>
+        </div>
+        <h1 style="margin: 0; font-size: 2rem;">Feature Stability & Drift Monitor</h1>
+        <p style="color: #94a3b8; margin: 0.2rem 0 0 0; font-size: 0.95rem;">
+            Continuous data drift detection using Population Stability Index (PSI) and Two-Sample Kolmogorov-Smirnov statistical tests.
+        </p>
+    </div>
+</div>
+""",
+    unsafe_allow_html=True,
+)
 
 
 @st.cache_data
@@ -34,12 +49,11 @@ def get_baseline_and_current_distributions():
     merged = merge_calendar_and_prices(sales_long, cal, prc)
     featured = build_feature_table(merged)
 
-    # Baseline (first 120 days) vs Current (last 60 days with simulated price inflation shock)
     dates = sorted(featured["date"].unique())
     base_df = featured[featured["date"] < dates[120]].copy()
     curr_df = featured[featured["date"] >= dates[120]].copy()
 
-    # Introduce simulated promotional drift in current data
+    # Introduce simulated promotional drift in current batch
     curr_df["sell_price"] = curr_df["sell_price"] * 1.35
     curr_df["price_discount_ratio"] = np.clip(curr_df["price_discount_ratio"] * 2.0, 0.0, 1.0)
     return base_df, curr_df
@@ -51,65 +65,87 @@ detector = DriftDetector(psi_warning_threshold=0.10, psi_critical_threshold=0.20
 detector.fit_baseline(base_df)
 report = detector.compute_drift_report(curr_df)
 
-# Top Status Banner
+# Top Telemetry Cards
 col1, col2, col3 = st.columns(3)
-with col1:
-    status_color = (
-        "red"
-        if report["overall_status"] == "CRITICAL_DRIFT"
-        else ("orange" if report["overall_status"] == "MODERATE_DRIFT" else "green")
+
+status_badge = (
+    '<span class="badge badge-red">CRITICAL DRIFT</span>'
+    if report["overall_status"] == "CRITICAL_DRIFT"
+    else (
+        '<span class="badge badge-amber">MODERATE DRIFT</span>'
+        if report["overall_status"] == "MODERATE_DRIFT"
+        else '<span class="badge badge-green">STABLE</span>'
     )
-    st.markdown(f"### Overall System Status: **:{status_color}[{report['overall_status']}]**")
+)
+
+with col1:
+    st.markdown(
+        f"""
+    <div class="kpi-card">
+        <div class="kpi-title">Overall System Telemetry</div>
+        <div style="margin: 0.4rem 0;">{status_badge}</div>
+        <div class="kpi-delta delta-neutral">● Continuous Ingestion Scan</div>
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
 
 with col2:
-    st.markdown(f"### Recommended Action: **`{report['recommended_action']}`**")
-
-with col3:
     st.markdown(
-        f"### Critical Drift Features: **`{report['num_critical_features']} / {report['num_features_checked']}`**"
+        f"""
+    <div class="kpi-card">
+        <div class="kpi-title">Recommended Action</div>
+        <div class="kpi-value" style="font-size: 1.25rem; font-family: monospace;">{report["recommended_action"]}</div>
+        <div class="kpi-delta delta-warning">● Auto-Trigger Policy</div>
+    </div>
+    """,
+        unsafe_allow_html=True,
     )
 
-st.divider()
+with col3:
+    crit_count = report["num_critical_features"]
+    total_count = report["num_features_checked"]
+    st.markdown(
+        f"""
+    <div class="kpi-card">
+        <div class="kpi-title">Drifted Feature Ratio</div>
+        <div class="kpi-value">{crit_count} / {total_count}</div>
+        <div class="kpi-delta delta-warning">● PSI &ge; 0.20 Threshold</div>
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
 
-# Feature PSI Leaderboard Table
-st.subheader("Feature Stability Index (PSI) Summary")
+st.markdown("<hr/>", unsafe_allow_html=True)
+
+# PSI Leaderboard
+st.markdown("### Feature Stability Index (PSI) Telemetry")
 
 records = []
 for feat, m in report["feature_metrics"].items():
     records.append(
         {
-            "Feature": feat,
-            "PSI Score": m.get("psi", 0.0),
-            "KS p-value": m.get("ks_p_value", 1.0),
+            "Feature Name": feat,
+            "PSI Metric": round(float(m.get("psi", 0.0)), 4),
+            "KS p-value": f"{float(m.get('ks_p_value', 1.0)):.2e}",
             "Status": m.get("status", "STABLE"),
         }
     )
 
-psi_df = pd.DataFrame(records).sort_values("PSI Score", ascending=False).reset_index(drop=True)
+psi_df = pd.DataFrame(records).sort_values("PSI Metric", ascending=False).reset_index(drop=True)
 
-# Format badges
 st.dataframe(
-    psi_df.style.map(
-        lambda val: (
-            "background-color: #fee2e2; color: #991b1b; font-weight: bold;"
-            if val == "CRITICAL_DRIFT"
-            else (
-                "background-color: #fef3c7; color: #92400e; font-weight: bold;"
-                if val == "MODERATE_DRIFT"
-                else "background-color: #dcfce7; color: #166534; font-weight: bold;"
-            )
-        ),
-        subset=["Status"],
-    ),
+    psi_df,
     use_container_width=True,
+    height=240,
 )
 
-st.divider()
+st.markdown("<hr/>", unsafe_allow_html=True)
 
-# Distribution Overlay Plot
-st.subheader("Distribution Comparison: Baseline vs Current Ingestion")
+# Distribution Shift Overlay
+st.markdown("### Empirical Density Shift Visualizer")
 selected_feature = st.selectbox(
-    "Select Feature to Inspect Distribution", psi_df["Feature"].tolist()
+    "Select Feature to Compare Empirical Distributions", psi_df["Feature Name"].tolist()
 )
 
 if selected_feature in base_df.columns and selected_feature in curr_df.columns:
@@ -118,31 +154,39 @@ if selected_feature in base_df.columns and selected_feature in curr_df.columns:
         go.Histogram(
             x=base_df[selected_feature].dropna(),
             histnorm="probability density",
-            name="Baseline Reference Distribution",
-            marker_color="rgba(37, 99, 235, 0.6)",
-            nbinsx=30,
+            name="Baseline Reference",
+            marker_color="rgba(59, 130, 246, 0.65)",
+            nbinsx=35,
         )
     )
     fig.add_trace(
         go.Histogram(
             x=curr_df[selected_feature].dropna(),
             histnorm="probability density",
-            name="Current Ingestion Distribution",
-            marker_color="rgba(239, 68, 68, 0.6)",
-            nbinsx=30,
+            name="Current Ingestion Batch",
+            marker_color="rgba(239, 68, 68, 0.65)",
+            nbinsx=35,
         )
     )
 
-    fig.update_layout(
-        title=f"<b>Population Density Shift:</b> <code>{selected_feature}</code> (PSI = {calculate_psi(base_df[selected_feature], curr_df[selected_feature]):.4f})",
+    feat_psi = calculate_psi(base_df[selected_feature], curr_df[selected_feature])
+    layout_opts = PLOTLY_LAYOUT.copy()
+    layout_opts.update(
+        title=dict(
+            text=f"<b>Population Density Shift:</b> <code>{selected_feature}</code> (PSI = {feat_psi:.4f})",
+            font=dict(color="#f8fafc", size=14),
+        ),
         xaxis_title=selected_feature,
         yaxis_title="Probability Density",
         barmode="overlay",
-        template="plotly_white",
+        height=400,
     )
+    fig.update_layout(**layout_opts)
     st.plotly_chart(fig, use_container_width=True)
 
+# Trigger Action
+st.markdown("<br/>", unsafe_allow_html=True)
 if st.button("🚀 Trigger Automated Retraining Pipeline (Airflow/MLflow)"):
     st.success(
-        "Retraining pipeline job submitted to MLflow Model Registry! Target alias updated to 'challenger'."
+        "✅ Retraining pipeline job submitted to MLflow Model Registry! Target alias updated to 'challenger'."
     )

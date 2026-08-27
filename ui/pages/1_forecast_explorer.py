@@ -15,12 +15,27 @@ from src.data.preprocess import melt_sales_data, merge_calendar_and_prices
 from src.evaluation.conformal import ConformalCalibrator
 from src.features.pipeline import build_feature_table
 from src.models.gbm import LightGBMForecaster
+from ui.styles import PLOTLY_LAYOUT, apply_custom_styles
 
 st.set_page_config(page_title="Forecast Explorer", page_icon="🔍", layout="wide")
+apply_custom_styles()
 
-st.title("🔍 Hierarchical Forecast Explorer & Uncertainty")
 st.markdown(
-    "Explore 28-day demand forecasts, actual historical sales, and calibrated **90% Conformal Prediction Intervals**."
+    """
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem;">
+            <span class="badge badge-blue">HIERARCHY SLICER</span>
+            <span class="badge badge-green">CONFORMAL CALIBRATED</span>
+        </div>
+        <h1 style="margin: 0; font-size: 2rem;">Demand Trajectory & Uncertainty Explorer</h1>
+        <p style="color: #94a3b8; margin: 0.2rem 0 0 0; font-size: 0.95rem;">
+            Explore multi-level retail demand projections with distribution-free 90% Split Conformal Prediction intervals.
+        </p>
+    </div>
+</div>
+""",
+    unsafe_allow_html=True,
 )
 
 
@@ -53,18 +68,18 @@ def get_sample_data_and_forecasts():
 
 featured_df, forecast_df = get_sample_data_and_forecasts()
 
-# Sidebar Filters
-st.sidebar.header("Hierarchy Filters")
+# Hierarchy Slicing Sidebar
+st.sidebar.markdown("### 🎛️ Hierarchy Slicing")
 states = sorted(featured_df["state_id"].unique().tolist())
-selected_state = st.sidebar.selectbox("Select State", states)
+selected_state = st.sidebar.selectbox("State / Region", states)
 
 stores = sorted(
     featured_df[featured_df["state_id"] == selected_state]["store_id"].unique().tolist()
 )
-selected_store = st.sidebar.selectbox("Select Store", stores)
+selected_store = st.sidebar.selectbox("Store Location", stores)
 
 cats = sorted(featured_df["cat_id"].unique().tolist())
-selected_cat = st.sidebar.selectbox("Select Category", cats)
+selected_cat = st.sidebar.selectbox("Product Category", cats)
 
 items = sorted(
     featured_df[
@@ -79,9 +94,9 @@ items = sorted(
 if not items:
     items = sorted(featured_df["id"].unique().tolist())
 
-selected_item = st.sidebar.selectbox("Select Item Series", items)
+selected_item = st.sidebar.selectbox("Item Identifier (SKU)", items)
 
-# Plot Series Forecast
+# Plot Forecast Series
 item_history = featured_df[featured_df["id"] == selected_item].sort_values("date").tail(60)
 item_forecast = forecast_df[forecast_df["id"] == selected_item].sort_values("date")
 
@@ -94,11 +109,12 @@ fig.add_trace(
         y=item_history["sales"],
         mode="lines+markers",
         name="Actual Sales (Ground Truth)",
-        line=dict(color="#1f2937", width=2.5),
+        line=dict(color="#f8fafc", width=2),
+        marker=dict(size=4, color="#94a3b8"),
     )
 )
 
-# Forecast Line
+# Forecast & Uncertainty Ribbon
 if not item_forecast.empty:
     fig.add_trace(
         go.Scatter(
@@ -106,43 +122,92 @@ if not item_forecast.empty:
             y=item_forecast["y_pred"],
             mode="lines+markers",
             name="LightGBM Point Forecast",
-            line=dict(color="#2563eb", width=2.5, dash="dash"),
+            line=dict(color="#38bdf8", width=2.5, dash="solid"),
+            marker=dict(size=5, color="#38bdf8"),
         )
     )
 
-    # Conformal 90% Bounds
+    # 90% Conformal Upper Bound
     fig.add_trace(
         go.Scatter(
-            x=item_forecast["date"].tolist() + item_forecast["date"].tolist()[::-1],
-            y=item_forecast["upper_90"].tolist() + item_forecast["lower_90"].tolist()[::-1],
-            fill="toself",
-            fillcolor="rgba(37, 99, 235, 0.2)",
-            line=dict(color="rgba(255,255,255,0)"),
-            name="90% Conformal Interval",
-            showlegend=True,
+            x=item_forecast["date"],
+            y=item_forecast["upper_90"],
+            mode="lines",
+            line=dict(color="rgba(99, 102, 241, 0.4)", width=1, dash="dot"),
+            name="90% Upper Bound",
+            showlegend=False,
         )
     )
 
-fig.update_layout(
-    title=f"<b>Demand Trajectory & 28-Day Horizon Forecast</b> — <code>{selected_item}</code>",
+    # 90% Conformal Lower Bound & Fill Ribbon
+    fig.add_trace(
+        go.Scatter(
+            x=item_forecast["date"],
+            y=item_forecast["lower_90"],
+            mode="lines",
+            line=dict(color="rgba(99, 102, 241, 0.4)", width=1, dash="dot"),
+            fill="tonexty",
+            fillcolor="rgba(99, 102, 241, 0.18)",
+            name="90% Conformal Coverage",
+        )
+    )
+
+layout_opts = PLOTLY_LAYOUT.copy()
+layout_opts.update(
+    title=dict(
+        text=f"<b>Demand Trajectory & 28-Day Forecast:</b> <code>{selected_item}</code>",
+        font=dict(color="#f8fafc", size=14),
+    ),
     xaxis_title="Date",
-    yaxis_title="Units Sold / Day",
-    template="plotly_white",
-    hovermode="x unified",
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    yaxis_title="Daily Unit Volume",
+    height=450,
 )
+fig.update_layout(**layout_opts)
 
 st.plotly_chart(fig, use_container_width=True)
 
-# Metrics table
-col1, col2, col3 = st.columns(3)
+# Metric Summary Cards
 if not item_forecast.empty:
+    col1, col2, col3 = st.columns(3)
+    total_vol = float(item_forecast["y_pred"].sum())
+    mean_rate = float(item_forecast["y_pred"].mean())
+    wape = float(
+        (item_forecast["sales"] - item_forecast["y_pred"]).abs().sum()
+        / (item_forecast["sales"].sum() + 1e-4)
+    )
+
     with col1:
-        st.metric("Total Forecasted Units (28d)", f"{item_forecast['y_pred'].sum():.1f}")
-    with col2:
-        st.metric("Mean Daily Rate", f"{item_forecast['y_pred'].mean():.2f} units/day")
-    with col3:
-        wape = (item_forecast["sales"] - item_forecast["y_pred"]).abs().sum() / (
-            item_forecast["sales"].sum() + 1e-4
+        st.markdown(
+            f"""
+        <div class="kpi-card">
+            <div class="kpi-title">Total Horizon Demand</div>
+            <div class="kpi-value">{total_vol:.1f}</div>
+            <div class="kpi-delta delta-neutral">● 28-Day Projected Units</div>
+        </div>
+        """,
+            unsafe_allow_html=True,
         )
-        st.metric("Validation Horizon WAPE", f"{wape * 100:.1f}%")
+
+    with col2:
+        st.markdown(
+            f"""
+        <div class="kpi-card">
+            <div class="kpi-title">Average Daily Velocity</div>
+            <div class="kpi-value">{mean_rate:.2f}</div>
+            <div class="kpi-delta delta-neutral">● Units per Day</div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+    with col3:
+        st.markdown(
+            f"""
+        <div class="kpi-card">
+            <div class="kpi-title">Validation Error (WAPE)</div>
+            <div class="kpi-value">{wape * 100:.1f}%</div>
+            <div class="kpi-delta delta-positive">● Conformal Calibrated</div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
