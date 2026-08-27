@@ -10,10 +10,7 @@ root_dir = Path(__file__).resolve().parents[2]
 if str(root_dir) not in sys.path:
     sys.path.append(str(root_dir))
 
-from src.data.loader import generate_synthetic_m5_data
-from src.data.preprocess import melt_sales_data, merge_calendar_and_prices
-from src.features.pipeline import build_feature_table
-from src.models.gbm import LightGBMForecaster
+from src.utils.demo_cache import get_or_create_demo_cache
 from ui.styles import PLOTLY_LAYOUT, apply_custom_styles
 
 st.set_page_config(page_title="Scenario Simulator", page_icon="🎮", layout="wide")
@@ -24,11 +21,11 @@ st.markdown(
 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
     <div>
         <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem;">
-            <span class="badge badge-blue">WHAT-IF ENGINE</span>
-            <span class="badge badge-amber">REVENUE SIMULATION</span>
+            <span class="badge badge-bronze">WHAT-IF ENGINE</span>
+            <span class="badge badge-terracotta">REVENUE SIMULATION</span>
         </div>
         <h1 style="margin: 0; font-size: 2rem;">Promotional & SNAP Scenario Simulator</h1>
-        <p style="color: #94a3b8; margin: 0.2rem 0 0 0; font-size: 0.95rem;">
+        <p style="color: #a89f91; margin: 0.2rem 0 0 0; font-size: 0.95rem;">
             Simulate the demand elasticity and revenue impact of promotional discounts and government SNAP benefit windows.
         </p>
     </div>
@@ -40,21 +37,13 @@ st.markdown(
 
 @st.cache_resource
 def get_trained_simulator_model():
-    cal, prc, sal = generate_synthetic_m5_data(
-        num_items=25, num_stores=2, num_days=120, random_seed=42
-    )
-    sales_long = melt_sales_data(sal)
-    merged = merge_calendar_and_prices(sales_long, cal, prc)
-    featured = build_feature_table(merged)
-
-    model = LightGBMForecaster(n_estimators=50, learning_rate=0.08)
-    model.fit(featured)
+    featured, _, model = get_or_create_demo_cache(root_dir)
     return model, featured
 
 
 model, base_features = get_trained_simulator_model()
 
-# Controls in Modern Card Container
+# Controls
 st.markdown("### Simulation Parameters")
 col1, col2, col3 = st.columns(3)
 
@@ -73,21 +62,17 @@ with col2:
 with col3:
     horizon = st.slider("Simulation Horizon (Days)", min_value=7, max_value=28, value=14, step=7)
 
-# Run Simulation
 sample_item = base_features["id"].iloc[0]
 sim_df = base_features[base_features["id"] == sample_item].sort_values("date").tail(horizon).copy()
 
-# Baseline Prediction
 base_preds = model.predict(sim_df, horizon=horizon)
 
-# Scenario Prediction
 scenario_df = sim_df.copy()
 scenario_df["sell_price"] = scenario_df["sell_price"] * (1.0 - discount_pct / 100.0)
 scenario_df["price_discount_ratio"] = discount_pct / 100.0
 scenario_df["active_snap"] = snap_active
 scenario_preds = model.predict(scenario_df, horizon=horizon)
 
-# Charting
 fig = go.Figure()
 
 fig.add_trace(
@@ -96,7 +81,7 @@ fig.add_trace(
         y=base_preds["y_pred"],
         mode="lines+markers",
         name="Baseline Plan",
-        line=dict(color="#64748b", width=2),
+        line=dict(color="#a89f91", width=2),
         marker=dict(size=4),
     )
 )
@@ -107,8 +92,8 @@ fig.add_trace(
         y=scenario_preds["y_pred"],
         mode="lines+markers",
         name=f"Simulated ({discount_pct}% Off, SNAP={snap_active})",
-        line=dict(color="#10b981", width=2.5),
-        marker=dict(size=5, color="#10b981"),
+        line=dict(color="#d4a373", width=2.5),
+        marker=dict(size=5, color="#d4a373"),
     )
 )
 
@@ -116,17 +101,15 @@ layout_opts = PLOTLY_LAYOUT.copy()
 layout_opts.update(
     title=dict(
         text=f"<b>Simulated Demand Trajectory:</b> <code>{sample_item}</code>",
-        font=dict(color="#f8fafc", size=14),
+        font=dict(color="#fbf8f5", size=14),
     ),
     xaxis_title="Date",
     yaxis_title="Projected Daily Units",
     height=400,
 )
 fig.update_layout(**layout_opts)
-
 st.plotly_chart(fig, use_container_width=True)
 
-# Business Impact Calculations
 base_vol = float(base_preds["y_pred"].sum())
 sim_vol = float(scenario_preds["y_pred"].sum())
 lift_pct = ((sim_vol - base_vol) / (base_vol + 1e-4)) * 100

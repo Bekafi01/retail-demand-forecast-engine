@@ -1,4 +1,4 @@
-"""Streamlit Main Application: Retail Demand Forecast Engine Dashboard with Horizontal Navigation."""
+"""Streamlit Main Application: Retail Demand Forecast Engine Dashboard with Instant Loading & Horizontal Navigation."""
 
 import sys
 from pathlib import Path
@@ -13,11 +13,7 @@ if str(root_dir) not in sys.path:
     sys.path.append(str(root_dir))
 
 from mlops.monitoring.drift import DriftDetector, calculate_psi
-from src.data.loader import generate_synthetic_m5_data
-from src.data.preprocess import melt_sales_data, merge_calendar_and_prices
-from src.evaluation.conformal import ConformalCalibrator
-from src.features.pipeline import build_feature_table
-from src.models.gbm import LightGBMForecaster
+from src.utils.demo_cache import get_or_create_demo_cache
 from ui.styles import PLOTLY_LAYOUT, apply_custom_styles
 
 st.set_page_config(
@@ -59,32 +55,13 @@ nav_selection = st.radio(
 st.markdown("<hr style='margin-top: 0.5rem; margin-bottom: 1.5rem;'/>", unsafe_allow_html=True)
 
 
-# Data & Model Cache
+# Sub-second Cached Data & Model Loader
 @st.cache_data
-def get_dashboard_data():
-    cal, prc, sal = generate_synthetic_m5_data(
-        num_items=30, num_stores=3, num_days=180, random_seed=42
-    )
-    sales_long = melt_sales_data(sal)
-    merged = merge_calendar_and_prices(sales_long, cal, prc)
-    featured = build_feature_table(merged)
+def load_fast_data():
+    return get_or_create_demo_cache(root_dir)
 
-    dates = sorted(featured["date"].unique())
-    train_df = featured[featured["date"] < dates[-28]]
-    val_df = featured[featured["date"] >= dates[-28]]
 
-    model = LightGBMForecaster(n_estimators=50, learning_rate=0.08)
-    model.fit(train_df)
-    preds = model.predict(val_df, horizon=28)
-
-    conformal = ConformalCalibrator(normalized=True)
-    conformal.fit(train_df["sales"].values[-len(preds) :], preds["y_pred"].values)
-    intervals_df = conformal.predict_intervals(preds, alphas=[0.1, 0.2])
-
-    merged_val = val_df.merge(
-        intervals_df[["id", "date", "y_pred", "lower_90", "upper_90"]], on=["id", "date"]
-    )
-    return featured, merged_val, model
+featured_df, forecast_df, model = load_fast_data()
 
 
 # ==============================================================================
@@ -190,8 +167,6 @@ if nav_selection == "🏠 Overview":
 # 2. FORECAST EXPLORER VIEW
 # ==============================================================================
 elif nav_selection == "🔍 Forecast Explorer":
-    featured_df, forecast_df, _ = get_dashboard_data()
-
     # Filter Bar
     st.markdown("### 🎛️ Hierarchy Slicing")
     f_col1, f_col2, f_col3, f_col4 = st.columns(4)
@@ -342,8 +317,6 @@ elif nav_selection == "🔍 Forecast Explorer":
 # 3. SCENARIO SIMULATOR VIEW
 # ==============================================================================
 elif nav_selection == "🎮 Scenario Simulator":
-    featured_df, _, model = get_dashboard_data()
-
     st.markdown("### 🎛️ Simulation Parameters")
     col1, col2, col3 = st.columns(3)
 
@@ -468,18 +441,21 @@ elif nav_selection == "🎮 Scenario Simulator":
 # 4. DRIFT MONITOR VIEW
 # ==============================================================================
 elif nav_selection == "🛡️ Drift Monitor":
-    featured_df, _, _ = get_dashboard_data()
 
-    dates = sorted(featured_df["date"].unique())
-    base_df = featured_df[featured_df["date"] < dates[120]].copy()
-    curr_df = featured_df[featured_df["date"] >= dates[120]].copy()
+    @st.cache_data
+    def compute_drift_telemetry(df: pd.DataFrame):
+        dates = sorted(df["date"].unique())
+        base = df[df["date"] < dates[120]].copy()
+        curr = df[df["date"] >= dates[120]].copy()
+        curr["sell_price"] = curr["sell_price"] * 1.35
+        curr["price_discount_ratio"] = np.clip(curr["price_discount_ratio"] * 2.0, 0.0, 1.0)
 
-    curr_df["sell_price"] = curr_df["sell_price"] * 1.35
-    curr_df["price_discount_ratio"] = np.clip(curr_df["price_discount_ratio"] * 2.0, 0.0, 1.0)
+        detector = DriftDetector(psi_warning_threshold=0.10, psi_critical_threshold=0.20)
+        detector.fit_baseline(base)
+        rep = detector.compute_drift_report(curr)
+        return base, curr, rep
 
-    detector = DriftDetector(psi_warning_threshold=0.10, psi_critical_threshold=0.20)
-    detector.fit_baseline(base_df)
-    report = detector.compute_drift_report(curr_df)
+    base_df, curr_df, report = compute_drift_telemetry(featured_df)
 
     col1, col2, col3 = st.columns(3)
 
